@@ -1,0 +1,80 @@
+	TLS Wrapper for Sendmail (and other MTAs)
+
+Requirements:
+	- Openssl (tested with 0.9.3, probably will work with > 0.9)
+	- Libwrap
+
+1. Compile sendmail-tls:
+
+	./configure --with-openssl=/usr/local/ssl   # or your ssl directory
+	make
+	su 
+	make install (as root)
+
+2. Create an RSA key and get a signed certificate.  The files must be stored 
+in the same file (/etc/smtps.pem in the example below), and the key must be 
+unencrypted (yes I know that's  bad, but the service is non-interactive so
+it can't really ask for a password).  
+
+If you have an established corporate or personal CA do this through whatever
+processes you normally use to generate a certificate for use.
+
+If you do not have a CA you want to use, you can have the Makefile generate a 
+self-signed cerificate for you. 
+
+	make cert
+	 (follow the on screen instructions, be sure the server name is correct)
+	make cert-install (as root)
+
+3. Add to /etc/services
+	
+	smtps        465/tcp   # smtp protocol over TLS/SSL
+
+4. Add to /etc/inetd.conf (line wrapped for ease of reading, it should be on one line)
+
+smtps   stream  tcp     nowait  root    /usr/sbin/sendmail-tls sendmail-tls \ 
+ 	-l ssl3 -u nobody -p /etc/smtps.pem -- /usr/sbin/sendmail -bs \
+	-C/etc/sendmail.relay.cf
+
+ The -l option sets the minimum protocol level for the service.  The
+possible options are ssl2, ssl3, and tls1.  SSL v2 and v3 works with new
+versions of Microsoft Outlook and Netscape Messenger.  TLSv1 does not work with both 
+yet.  I suggest you use SSLv3 as it is more secure than SSLv2.
+
+The -u options set sthe user to run as.  This must be set if inetd is
+configured to run sendmail-tls as root.  The service drops permissions as
+soon as it has started sendmail and read the certificate file (which is
+why it needs to be root to begin with). "nobody" is a good choice.
+
+the -p option sets the cert/key file.
+
+After the "--" is the sendmail command line.  The "-bs" tells sendmail to
+run on stdin/stdout, and the "-C" option tells sendmail to use an
+alternate configuration file.  
+
+The alternate configuration file is used because the mail relaying
+restrictions must be removed. This is necessary because sendmail no longer
+knows where the connection is actually comming from (it appears to be
+comming from a UNIX pipe) and therfore can not accurately check relaying
+rules.  
+
+To make this alternate configuration file, make a copy of your
+/etc/sendmail.cf and remove the "check_rcpt" ruleset.  
+
+5. Add TCP wrapper support to control access.
+
+Since the relay check has been removed from sendmail, access rules can be
+enforced using /etc/hosts.(allow|deny) files.  Assuming you deny all
+connections by default, access to this service can be turned on by the
+following line:
+
+	sendmail-tls:   192.168.1.	# ip address or range you want to allow
+
+6. Hopefully everything should be working now.
+
+NOTE On setting up Netscape.  Netscape is stupid about port numbers.  Even if you
+set it to use TLS for SMTP, it will still try to use port 25 instead of 465.  To
+get around this, you need to enter your smtp server as "mail.server.org:465"
+
+If you have any problems/questions/patches/etc please send them to Jeremy
+Beker <jbeker@3gi.com>

@@ -1,0 +1,41 @@
+dnl Process this file with autoconf to produce a configure script.
+AC_INIT(sendmail-tls.c)
+
+dnl Checks for programs.
+AC_PROG_CC
+AC_PROG_INSTALL
+
+AC_PREFIX_PROGRAM(sendmail)
+
+AC_ARG_WITH(openssl,
+[  --with-openssl=[path to openssl]    Location of OpenSSL files],
+	[
+		AC_MSG_CHECKING([for OpenSSL directory])
+		if test -f $with_openssl/include/openssl/ssl.h; then
+		AC_MSG_RESULT($with_openssl)
+		else
+		AC_MSG_ERROR("OpenSSL not in $with_openssl")
+		fi	
+	],[
+		AC_MSG_ERROR([--with-openssl must be specified])
+	]
+)
+
+LDFLAGS=-L$with_openssl/lib
+AC_SUBST(with_openssl)
+
+dnl Checks for libraries.
+AC_CHECK_LIB(crypto, ERR_load_CRYPTO_strings)
+AC_CHECK_LIB(ssl, ERR_load_SSL_strings)
+AC_CHECK_LIB(nss_nis, yp_get_default_domain)
+AC_CHECK_LIB(wrap, request_init,,AC_MSG_WARN([*** build will not include tcp wrapper support ***]))
+
+dnl Checks for header files.
+AC_HEADER_STDC
+AC_CHECK_HEADERS(sys/time.h syslog.h unistd.h)
+
+dnl Checks for library functions.
+AC_CHECK_FUNCS(poll)
+
+AC_CONFIG_HEADER(config.h)
+AC_OUTPUT(Makefile)

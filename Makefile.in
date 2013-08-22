@@ -1,0 +1,35 @@
+BINDIR = @prefix@/sbin
+
+INC_DIRS = @with_openssl@/include
+LIB_DIRS = @with_openssl@/lib
+OPENSSL_BIN = @with_openssl@/bin
+
+CFLAGS = @CFLAGS@ -Wall
+LIBFLAGS = @LDFLAGS@ @LIBS@
+INSTALL = @INSTALL@
+
+
+OBJS = sendmail-tls.o
+
+.c.o:
+	$(CC) $(CFLAGS) -c -I $(INC_DIRS) $(CFLAGS) $<
+
+all: $(OBJS)
+	$(CC) $(CFLAGS) $(OBJS) -o sendmail-tls $(LIBFLAGS)
+	strip sendmail-tls
+
+cert:
+	$(OPENSSL_BIN)/openssl genrsa -out server.key 1024
+	$(OPENSSL_BIN)/openssl req -new -x509 -config ./myssl.cnf -days 365 -key server.key -out server.crt
+	/bin/cat server.key > smtps.pem
+	echo "" >> smtps.pem
+	/bin/cat server.crt >> smtps.pem
+
+cert-install: smtps.pem
+	$(INSTALL) -m 0400 -o root smtps.pem /etc/
+
+install: sendmail-tls
+	$(INSTALL) -m 0700 sendmail-tls $(BINDIR) 
+
+clean:
+	rm -f sendmail-tls *.o core config.cache server.key server.crt smtps.pem
